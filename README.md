@@ -25,8 +25,9 @@ installed, but I do not have the ability to test that.
 ## Installation
 
 1. Close SimCity 4.
-2. Copy `SC4CPUOptions.dll` and `SC4CPUOptions.ini` into the Plugins folder in the SimCity 4 installation directory.
-3. Configure the plugin settings, see the *Configuring the plugin* section.
+2. Remove `SC4SingleCPU.dll` and `SC4CPUPriority.dll` from the Plugins folder in the SimCity 4 installation directory, if present.
+3. Copy `SC4CPUOptions.dll` and `SC4CPUOptions.ini` into the Plugins folder in the SimCity 4 installation directory.
+4. Configure the plugin settings, see the *Configuring the plugin* section.
 
 ## Configuring the plugin
 
