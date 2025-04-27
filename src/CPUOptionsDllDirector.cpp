@@ -326,7 +326,7 @@ public:
 
 private:
 
-	void SetCPUPriorityFromConfigFile()
+	void SetCPUPriorityFromConfigFile() const
 	{
 		Logger& logger = Logger::GetInstance();
 
