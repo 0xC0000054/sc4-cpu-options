@@ -2,13 +2,37 @@
 
 A DLL Plugin for SimCity 4 that configures the CPU core count and priority.
 
-This plugin combines the functionality of the [SingleCPU](https://github.com/0xC0000054/sc4-single-cpu)
-and [CPUPriority](https://github.com/0xC0000054/sc4-cpu-priority) plugins in a single DLL, and adds the ability to
-set the CPU priority without using a command line argument.
+It has no settings and no configuration file: everything is automatic.
 
-If the `-CPUCount` and/or `-CPUPriority` command line arguments are present, those values will be used
-in place of the plugin's default options. When those command line arguments are not present, the plugin
-will configure SC4 to use 1 CPU core and the CPU priority specified in the configuration file.
+* **One core for the game, the others for the parallel render cull**: SimCity 4's own threads run on one core
+(a performance core on a hybrid CPU), which avoids the game's multi-core crashes. Only the game's threads are
+restricted: the parallel render cull's worker threads run on the other cores, off the game's physical core.
+* **High priority**: the game runs at high CPU priority. A `-CPUPriority` command line argument still wins,
+with these values: High, AboveNormal, Normal, BelowNormal, Idle, and Low (which the game applies itself).
+* **Performance cores**: on a hybrid CPU (Intel 12th generation and later) the game's threads stay on the performance
+cores. No effect on other CPUs.
+* **Power throttling**: Windows 11 no longer slows the game down (EcoQoS) when it is not the foreground window.
+* **Parallel render cull**: the search for what is visible in the 3D view is shared among the render thread and up
+to 7 workers on the other cores (it needs at least 2 free logical processors besides the game's core). The sorting
+and drawing stay on the game's render thread, unchanged.
+* **Simulation tick budget**: the simulation may take at most 32 ms before the game draws the next frame,
+instead of up to 66 ms, so scrolling and the interface stay smooth in a busy city.
+
+The last four come from the [SCD3D11](https://github.com/UlisseWolf/scd3d11) graphics driver. The parallel render
+cull and the simulation tick budget patch the game's code and require SimCity 4 version 1.1.641; on other versions
+they stay off.
+
+For troubleshooting, these command line arguments turn parts off:
+
+| Argument | Effect |
+--------|--------
+| `-ParallelCull:off` | No parallel render cull. |
+| `-SimTickCap:off` | The game's own simulation budget of 33 to 66 ms. |
+| `-SimTickCap:<ms>` | Another budget, 15 to 500 ms. |
+| `-CPUCount:<n>` | The game's own option: the game picks its cores, the plugin does not restrict its threads, and the parallel render cull's workers share the same cores. When the game is left with one core, the cull stays off. |
+
+If SCD3D11 is also installed, the plugin loaded second finds the game's code already patched and leaves it alone,
+so the patches are applied once.
 
 This plugin is incompatible with 3rd-party launchers that set a CPU priority, it will override the CPU priority
 setting they set when starting the game.
@@ -26,31 +50,8 @@ installed, but I do not have the ability to test that.
 
 1. Close SimCity 4.
 2. Remove `SC4SingleCPU.dll` and `SC4CPUPriority.dll` from the Plugins folder in the SimCity 4 installation directory, if present.
-3. Copy `SC4CPUOptions.dll` and `SC4CPUOptions.ini` into the Plugins folder in the SimCity 4 installation directory.
-4. Configure the plugin settings, see the *Configuring the plugin* section.
-
-## Configuring the plugin
-
-1. Open `SC4CPUOptions.ini` in a text editor (e.g. Notepad).
-Note that depending on the permissions of your SimCity 4 installation directory you may need to start the text editor with administrator permissions to be able to save the file.
-
-2. Adjust the settings in the `[CPUOptions]` section to your preferences.
-
-3. Save the file and start the game.
-
-### Settings overview
-
-**Priority** is the CPU priority that the game will use, the default is *AboveNormal*.
-The supported values are listed in the following table:
-
-| Priority Value | Notes |
---------|--------
-| High ||
-| AboveNormal ||
-| Normal | The default value for a process, unless the parent process has a different value. |
-| BelowNormal ||
-| Idle ||
-| Low | An alias for Idle. |
+3. Remove `SC4CPUOptions.ini` from the Plugins folder, if present; the plugin no longer reads it.
+4. Copy `SC4CPUOptions.dll` into the Plugins folder in the SimCity 4 installation directory.
 
 ## Troubleshooting
 
@@ -62,29 +63,39 @@ The log contains status information for the most recent run of the plugin.
 This project is licensed under the terms of the MIT License.    
 See [LICENSE.txt](LICENSE.txt) for more information.
 
+The files that come from SCD3D11 (`CpuScheduling`, `ParallelRenderCull`, `SimTickBudget` and
+`tests/CpuSchedulingTest.cpp`) are licensed under the GNU Lesser General Public License, version 2.1 or later,
+as their headers say. See [Third Party Notices.txt](Third%20Party%20Notices.txt).
+
 ## 3rd party code
 
-[gzcom-dll](https://github.com/nsgomez/gzcom-dll/tree/master) Located in the vendor folder, MIT License.    
-[Windows Implementation Library](https://github.com/microsoft/wil) - MIT License    
-[Boost.Algorithm](https://www.boost.org/doc/libs/1_84_0/libs/algorithm/doc/html/index.html) - Boost Software License, Version 1.0.    
-[Boost.PropertyTree](https://www.boost.org/doc/libs/1_84_0/doc/html/property_tree.html) - Boost Software License, Version 1.0.
+[gzcom-dll](https://github.com/nsgomez/gzcom-dll/tree/master) Located in the vendor folder, MIT License.
 
 # Source Code
 
 ## Prerequisites
 
-* Visual Studio 2022
+* Visual Studio 2022 or later, with the *Desktop development with C++* workload
+
+The project builds with the toolset of whichever Visual Studio opens it, and needs no NuGet or vcpkg packages.
 
 ## Building the plugin
 
 * Open the solution in the `src` folder
-* Update the post build events to copy the build output to you SimCity 4 application plugins folder.
+* Optionally, set `SC4PluginsDir` to your SimCity 4 Plugins folder, as an environment variable or in the project's
+`UserMacros`, so each build is copied there. Without it the DLL stays in the build output folder.
 * Build the solution
+
+## Testing
+
+`tests/CpuSchedulingTest.cpp` checks the performance-core selection. Build it as a 32-bit console program with
+`src/CpuScheduling.cpp` and `src/Logger.cpp` in the Debug configuration, so the asserts are on; it returns 0 when every
+check passes.
 
 ## Debugging the plugin
 
 Visual Studio can be configured to launch SimCity 4 on the Debugging page of the project properties.
 I configured the debugger to launch the game in a window with the following command line:    
-`-intro:off -CPUCount:1 -CPUPriority:high -w -CustomResolution:enabled -r1920x1080x32`
+`-intro:off -w -CustomResolution:enabled -r1920x1080x32`
 
 You may need to adjust the resolution for your screen.

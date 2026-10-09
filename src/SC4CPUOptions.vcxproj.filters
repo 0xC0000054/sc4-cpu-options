@@ -21,6 +21,18 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CpuScheduling.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GameVersion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ParallelRenderCull.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SimTickBudget.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -41,6 +53,18 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CpuScheduling.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GameVersion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ParallelRenderCull.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SimTickBudget.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Logger.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -62,10 +86,5 @@
   <ItemGroup>
     <None Include=".editorconfig" />
     <None Include="IgnoredWords.dic" />
-    <None Include="packages.config" />
-    <None Include="vcpkg.json" />
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="$(MSBuildThisFileDirectory)..\..\natvis\wil.natvis" />
   </ItemGroup>
 </Project>

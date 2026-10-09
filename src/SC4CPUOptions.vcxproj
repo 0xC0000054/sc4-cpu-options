@@ -14,7 +14,11 @@
     <ClInclude Include="..\vendor\gzcom-dll\include\cIGZCmdLine.h" />
     <ClInclude Include="..\vendor\gzcom-dll\include\cIGZFrameWork.h" />
     <ClInclude Include="..\vendor\gzcom-dll\include\cRZCOMDllDirector.h" />
+    <ClInclude Include="CpuScheduling.h" />
+    <ClInclude Include="GameVersion.h" />
     <ClInclude Include="Logger.h" />
+    <ClInclude Include="ParallelRenderCull.h" />
+    <ClInclude Include="SimTickBudget.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="version.h" />
   </ItemGroup>
@@ -22,7 +26,11 @@
     <ClCompile Include="..\vendor\gzcom-dll\src\cRZBaseString.cpp" />
     <ClCompile Include="..\vendor\gzcom-dll\src\cRZCOMDllDirector.cpp" />
     <ClCompile Include="CPUOptionsDllDirector.cpp" />
+    <ClCompile Include="CpuScheduling.cpp" />
+    <ClCompile Include="GameVersion.cpp" />
     <ClCompile Include="Logger.cpp" />
+    <ClCompile Include="ParallelRenderCull.cpp" />
+    <ClCompile Include="SimTickBudget.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="version.rc" />
@@ -30,8 +38,6 @@
   <ItemGroup>
     <None Include=".editorconfig" />
     <None Include="IgnoredWords.dic" />
-    <None Include="packages.config" />
-    <None Include="vcpkg.json" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -44,13 +50,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -65,9 +71,10 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Label="Vcpkg">
-    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+  <PropertyGroup Label="UserMacros">
+    <!-- The game's Plugins folder, for the post-build copy. Empty: no copy. Set it here, as an
+         environment variable of the same name, or with /p:SC4PluginsDir=<folder>. -->
+    <SC4PluginsDir Condition="'$(SC4PluginsDir)' == ''"></SC4PluginsDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -85,9 +92,11 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "$(TargetPath)" "G:\GOG Galaxy\Games\SimCity 4 Deluxe Edition\Plugins" /y</Command>
+      <Command>if not "$(SC4PluginsDir)"=="" if exist "$(SC4PluginsDir)\*" copy /y "$(TargetPath)" "$(SC4PluginsDir)"</Command>
+      <Message>Copies the DLL to $(SC4PluginsDir), when that names the game's Plugins folder.</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -112,19 +121,14 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "$(TargetPath)" "G:\GOG Galaxy\Games\SimCity 4 Deluxe Edition\Plugins" /y</Command>
+      <Command>if not "$(SC4PluginsDir)"=="" if exist "$(SC4PluginsDir)\*" copy /y "$(TargetPath)" "$(SC4PluginsDir)"</Command>
+      <Message>Copies the DLL to $(SC4PluginsDir), when that names the game's Plugins folder.</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="packages\Microsoft.Windows.ImplementationLibrary.1.0.231216.1\build\native\Microsoft.Windows.ImplementationLibrary.targets" Condition="Exists('packages\Microsoft.Windows.ImplementationLibrary.1.0.231216.1\build\native\Microsoft.Windows.ImplementationLibrary.targets')" />
   </ImportGroup>
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('packages\Microsoft.Windows.ImplementationLibrary.1.0.231216.1\build\native\Microsoft.Windows.ImplementationLibrary.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Windows.ImplementationLibrary.1.0.231216.1\build\native\Microsoft.Windows.ImplementationLibrary.targets'))" />
-  </Target>
 </Project>
