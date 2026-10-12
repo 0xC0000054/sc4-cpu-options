@@ -1,6 +1,6 @@
 /*
  *  This file is part of sc4-cpu-options. It comes from SCD3D11, a free Direct3D 11
- *  driver for SimCity 4's SimGL interface (https://github.com/UlisseWolf/scd3d11).
+ *  driver for SimCity 4's SimGL interface (https://github.com/caspervg/scd3d11).
  *  Copyright (C) 2026 Casper Van Gheluwe
  *
  *  This library is free software; you can redistribute it and/or

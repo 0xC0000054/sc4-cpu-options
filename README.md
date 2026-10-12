@@ -18,7 +18,7 @@ and drawing stay on the game's render thread, unchanged.
 * **Simulation tick budget**: the simulation may take at most 32 ms before the game draws the next frame,
 instead of up to 66 ms, so scrolling and the interface stay smooth in a busy city.
 
-The last four come from the [SCD3D11](https://github.com/UlisseWolf/scd3d11) graphics driver. The parallel render
+The last four come from the [SCD3D11](https://github.com/caspervg/scd3d11) graphics driver. The parallel render
 cull and the simulation tick budget patch the game's code and require SimCity 4 version 1.1.641; on other versions
 they stay off.
 
@@ -60,16 +60,15 @@ The log contains status information for the most recent run of the plugin.
 
 # License
 
-This project is licensed under the terms of the MIT License.    
+This project is licensed under the terms of the GNU Lesser General Public License, version 2.1 or later.    
 See [LICENSE.txt](LICENSE.txt) for more information.
-
-The files that come from SCD3D11 (`CpuScheduling`, `ParallelRenderCull`, `SimTickBudget` and
-`tests/CpuSchedulingTest.cpp`) are licensed under the GNU Lesser General Public License, version 2.1 or later,
-as their headers say. See [Third Party Notices.txt](Third%20Party%20Notices.txt).
 
 ## 3rd party code
 
-[gzcom-dll](https://github.com/nsgomez/gzcom-dll/tree/master) Located in the vendor folder, MIT License.
+[gzcom-dll](https://github.com/nsgomez/gzcom-dll) Located in the vendor folder, MIT License.
+[SCD3D11](https://github.com/nsgomez/gzcom-dll) - Original source for several CPU fixes, GNU Lesser General Public License, version 2.1 or later License.
+
+The files that come from SCD3D11 are (`CpuScheduling`, `ParallelRenderCull`, `SimTickBudget` and `tests/CpuSchedulingTest.cpp`).
 
 # Source Code
 
