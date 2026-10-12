@@ -13,9 +13,11 @@
 
 #include <cstdint>
 
-namespace ParallelRenderCull {
+namespace ParallelRenderCull
+{
 
-	enum class Mode {
+	enum class Mode
+	{
 		Off,      // do not install; stock code runs untouched
 		Passthru, // install, but call the stock code (debugging aid)
 		TailOnly, // skip the gather, run only the sort and draw (debugging aid)
@@ -24,7 +26,7 @@ namespace ParallelRenderCull {
 	};
 
 	// "off" / "0" / "false", "passthru", "tailonly", "serial"; anything else is Parallel.
-	Mode ParseMode(const char *value);
+	Mode ParseMode(const char* value);
 
 	// The most workers the pool starts; the render thread gathers alongside them.
 	constexpr unsigned kMaxWorkers = 7;

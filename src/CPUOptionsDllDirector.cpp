@@ -393,7 +393,8 @@ public:
 	}
 };
 
-cRZCOMDllDirector* RZGetCOMDllDirector() {
+cRZCOMDllDirector* RZGetCOMDllDirector()
+{
 	static CPUOptionsDllDirector sDirector;
 	return &sDirector;
 }

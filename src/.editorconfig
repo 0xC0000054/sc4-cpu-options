@@ -8,3 +8,12 @@ vsspell_ignored_words_30a86b75973f41d3b6fe30b8f7950859 = File:IgnoredWords.dic
 indent_style = tab
 indent_size = 4
 trim_trailing_whitespace = true
+
+# Visual Studio C++ style options
+
+# Brace settings
+cpp_new_line_before_open_brace_namespace = new_line
+cpp_new_line_before_open_brace_type = new_line
+cpp_new_line_before_open_brace_function = new_line
+cpp_new_line_before_open_brace_block = new_line
+cpp_new_line_before_open_brace_lambda = new_line

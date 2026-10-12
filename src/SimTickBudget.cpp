@@ -36,8 +36,10 @@
 
 #include <Windows.h>
 
-namespace SimTickBudget {
-	namespace {
+namespace SimTickBudget
+{
+	namespace
+	{
 
 		constexpr uintptr_t kImageBase = 0x00400000;
 		constexpr uintptr_t kPatchVA = 0x00703EF1;   // cmp eax, 0x0F ...
@@ -47,7 +49,7 @@ namespace SimTickBudget {
 
 		// Exact bytes we replace, guarding against a different build / other hook.
 		const uint8_t kExpected[kPatchLen] = {
-			0x83, 0xF8, 0x0F, 0x7F, 0x05, 0xB8, 0x0F, 0x00, 0x00, 0x00, 0x89, 0x46, 0x70};
+			0x83, 0xF8, 0x0F, 0x7F, 0x05, 0xB8, 0x0F, 0x00, 0x00, 0x00, 0x89, 0x46, 0x70 };
 
 		constexpr int kFloorMs = 15;
 		constexpr int kMaxCapMs = 500;
@@ -55,13 +57,14 @@ namespace SimTickBudget {
 		int gCapMs = kDefaultCapMs;      // read by the stub
 		uintptr_t gRejoin = 0;           // read by the stub
 
-		uint8_t *gTarget = nullptr;
+		uint8_t* gTarget = nullptr;
 		uint8_t gSaved[kPatchLen]{};
 		bool gInstalled = false;
 
 		// EAX = raw budget, ESI = this. Clamp to [kFloorMs, gCapMs], store, rejoin.
 		// ECX/EDX are dead here (IDIV leftovers).
-		__declspec(naked) void BudgetStub() {
+		__declspec(naked) void BudgetStub()
+		{
 			__asm {
 				cmp  eax, 15            // kFloorMs
 				jge  above_floor
@@ -80,42 +83,47 @@ namespace SimTickBudget {
 
 	} // namespace
 
-	bool Install(int capMs) {
+	bool Install(int capMs)
+	{
 		if (gInstalled) return true;
 
-		if (capMs <= 0) {
+		if (capMs <= 0)
+		{
 			Logger::GetInstance().WriteLine(LogLevel::Info, "sim tick budget: turned off");
 			return false;
 		}
 		int cap = capMs;
 		if (cap < kFloorMs) cap = kFloorMs;
 		if (cap > kMaxCapMs) cap = kMaxCapMs;
-		if (!GameVersion::IsSupportedForPatches()) {
+		if (!GameVersion::IsSupportedForPatches())
+		{
 			Logger::GetInstance().WriteLineFormatted(LogLevel::Info, "sim tick budget: requires SimCity 4 1.1.641, skipping");
 			return false;
 		}
 
-		auto module = reinterpret_cast<uint8_t *>(GetModuleHandleW(nullptr));
+		auto module = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
 		if (module == nullptr) return false;
 		gTarget = module + (kPatchVA - kImageBase);
 		gRejoin = reinterpret_cast<uintptr_t>(module + (kRejoinVA - kImageBase));
 		gCapMs = cap;
 
-		if (std::memcmp(gTarget, kExpected, kPatchLen) != 0) {
+		if (std::memcmp(gTarget, kExpected, kPatchLen) != 0)
+		{
 			Logger::GetInstance().WriteLineFormatted(LogLevel::Info, "sim tick budget: cSC4Simulator::OnTick already modified, skipping");
 			gTarget = nullptr;
 			return false;
 		}
 
 		DWORD prot = 0;
-		if (!VirtualProtect(gTarget, kPatchLen, PAGE_EXECUTE_READWRITE, &prot)) {
+		if (!VirtualProtect(gTarget, kPatchLen, PAGE_EXECUTE_READWRITE, &prot))
+		{
 			gTarget = nullptr;
 			return false;
 		}
 		std::memcpy(gSaved, gTarget, kPatchLen);
 		gTarget[0] = 0xE9;
 		int32_t const disp = static_cast<int32_t>(reinterpret_cast<uintptr_t>(&BudgetStub) -
-		                                          (reinterpret_cast<uintptr_t>(gTarget) + kJumpSize));
+			(reinterpret_cast<uintptr_t>(gTarget) + kJumpSize));
 		std::memcpy(gTarget + 1, &disp, sizeof(disp));
 		std::memset(gTarget + kJumpSize, 0x90, kPatchLen - kJumpSize);
 		DWORD ignored = 0;
@@ -127,10 +135,12 @@ namespace SimTickBudget {
 		return true;
 	}
 
-	void Uninstall() {
+	void Uninstall()
+	{
 		if (!gInstalled) return;
 		DWORD prot = 0;
-		if (VirtualProtect(gTarget, kPatchLen, PAGE_EXECUTE_READWRITE, &prot)) {
+		if (VirtualProtect(gTarget, kPatchLen, PAGE_EXECUTE_READWRITE, &prot))
+		{
 			std::memcpy(gTarget, gSaved, kPatchLen);
 			DWORD ignored = 0;
 			VirtualProtect(gTarget, kPatchLen, prot, &ignored);

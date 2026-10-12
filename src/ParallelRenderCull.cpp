@@ -38,8 +38,10 @@
 
 #include <Windows.h>
 
-namespace ParallelRenderCull {
-	namespace {
+namespace ParallelRenderCull
+{
+	namespace
+	{
 
 		constexpr uintptr_t kImageBase = 0x00400000;
 
@@ -56,7 +58,7 @@ namespace ParallelRenderCull {
 		// push ebp / mov ebp,esp / and esp,-8 / sub esp,<70|78>
 		constexpr size_t kRelocatedBytes = 6;
 		constexpr size_t kJumpSize = 5;
-		const uint8_t kPrologue[8] = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF8, 0x83, 0xEC};
+		const uint8_t kPrologue[8] = { 0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF8, 0x83, 0xEC };
 		const uint8_t kStaticFrameByte = 0x70;
 		const uint8_t kDynamicFrameByte = 0x78;
 
@@ -83,24 +85,26 @@ namespace ParallelRenderCull {
 
 		constexpr size_t kViewObjVtGetSortValue = 0x44; // cS3DModelInstance::GetSortValue
 
-		struct SortEl {
-			void *model;
+		struct SortEl
+		{
+			void* model;
 			int32_t key;
 		};
 		static_assert(sizeof(SortEl) == 8, "cSC4ModelSortElement is 8 bytes");
 
-		struct RawVec {
-			uint8_t *begin;
-			uint8_t *end;
-			uint8_t *cap;
+		struct RawVec
+		{
+			uint8_t* begin;
+			uint8_t* end;
+			uint8_t* cap;
 		};
 
-		using GetVisibleContainerRectFn = void(__thiscall *)(void *, float *, int);
-		using ComputeViewportZProjectionFn = void(__cdecl *)(float *, void *);
-		using GetQuadrantsOfScreenRectFn = void(__thiscall *)(void *, float *, int *, int *, int *, int *);
-		using SetForDepthSortFn = void(__thiscall *)(void *, void *, float *);
-		using GetSortValueFn = void(__thiscall *)(void *, uint32_t *);
-		using DrawViewFn = void(__fastcall *)(void *);
+		using GetVisibleContainerRectFn = void(__thiscall*)(void*, float*, int);
+		using ComputeViewportZProjectionFn = void(__cdecl*)(float*, void*);
+		using GetQuadrantsOfScreenRectFn = void(__thiscall*)(void*, float*, int*, int*, int*, int*);
+		using SetForDepthSortFn = void(__thiscall*)(void*, void*, float*);
+		using GetSortValueFn = void(__thiscall*)(void*, uint32_t*);
+		using DrawViewFn = void(__fastcall*)(void*);
 
 		GetVisibleContainerRectFn GetVisibleContainerRect = nullptr;
 		ComputeViewportZProjectionFn ComputeViewportZProjection = nullptr;
@@ -111,50 +115,59 @@ namespace ParallelRenderCull {
 		uintptr_t gDynamicTailTarget = 0; // read by DynamicTailThunk
 
 		Mode gMode = Mode::Parallel;
-		std::atomic<uint32_t> gStaticCalls{0};
-		std::atomic<uint32_t> gDynamicCalls{0};
+		std::atomic<uint32_t> gStaticCalls{ 0 };
+		std::atomic<uint32_t> gDynamicCalls{ 0 };
 
 		// Set if a worker range faults; RunDetour then falls back to the stock path.
-		std::atomic<uint32_t> gWorkerFaultCode{0};
-		std::atomic<void *> gWorkerFaultAddr{nullptr};
+		std::atomic<uint32_t> gWorkerFaultCode{ 0 };
+		std::atomic<void*> gWorkerFaultAddr{ nullptr };
 
-		int WorkerFilter(uint32_t code, _EXCEPTION_POINTERS *ep) {
+		int WorkerFilter(uint32_t code, _EXCEPTION_POINTERS* ep)
+		{
 			gWorkerFaultCode.store(code);
 			gWorkerFaultAddr.store(ep && ep->ExceptionRecord ? ep->ExceptionRecord->ExceptionAddress : nullptr);
 			return EXCEPTION_EXECUTE_HANDLER;
 		}
 
-		void SafeInvoke(const std::function<void(unsigned)> &body, unsigned i) {
-			__try {
+		void SafeInvoke(const std::function<void(unsigned)>& body, unsigned i)
+		{
+			__try
+			{
 				body(i);
-			} __except (WorkerFilter(GetExceptionCode(), GetExceptionInformation())) {
+			}
+			__except (WorkerFilter(GetExceptionCode(), GetExceptionInformation()))
+			{
 			}
 		}
 
 		// ---- worker pool --------------------------------------------------
 
-		class WorkerPool {
+		class WorkerPool
+		{
 		public:
 			// affinity is the processors the workers may run on, 0 for anywhere.
-			void Start(unsigned workers, uintptr_t affinity) {
+			void Start(unsigned workers, uintptr_t affinity)
+			{
 				stop_ = false;
 				generation_ = 0;
 				threads_.reserve(workers);
 				for (unsigned i = 0; i < workers; ++i)
-					threads_.emplace_back([this, affinity] {
-						if (affinity != 0) SetThreadAffinityMask(GetCurrentThread(), affinity);
-						Loop();
-					});
+					threads_.emplace_back([this, affinity]
+						{
+							if (affinity != 0) SetThreadAffinityMask(GetCurrentThread(), affinity);
+							Loop();
+						});
 			}
 
-			void Stop() {
+			void Stop()
+			{
 				{
 					std::lock_guard<std::mutex> lock(mutex_);
 					stop_ = true;
 					++generation_;
 				}
 				wake_.notify_all();
-				for (auto &t : threads_)
+				for (auto& t : threads_)
 					if (t.joinable()) t.join();
 				threads_.clear();
 			}
@@ -162,9 +175,11 @@ namespace ParallelRenderCull {
 			unsigned Size() const { return static_cast<unsigned>(threads_.size()); }
 
 			// body(i) for i in [0,ranges); caller participates; blocks until done.
-			void Run(unsigned ranges, const std::function<void(unsigned)> &body) {
+			void Run(unsigned ranges, const std::function<void(unsigned)>& body)
+			{
 				if (ranges == 0) return;
-				if (threads_.empty() || ranges == 1) {
+				if (threads_.empty() || ranges == 1)
+				{
 					for (unsigned i = 0; i < ranges; ++i) body(i);
 					return;
 				}
@@ -184,9 +199,11 @@ namespace ParallelRenderCull {
 			}
 
 		private:
-			void Loop() {
+			void Loop()
+			{
 				uint64_t seen = 0;
-				for (;;) {
+				for (;;)
+				{
 					std::unique_lock<std::mutex> lock(mutex_);
 					wake_.wait(lock, [this, &seen] { return stop_ || generation_ != seen; });
 					seen = generation_;
@@ -194,17 +211,20 @@ namespace ParallelRenderCull {
 					lock.unlock();
 					Drain();
 					lock.lock();
-					if (--pending_ == 0) {
+					if (--pending_ == 0)
+					{
 						lock.unlock();
 						done_.notify_one();
 					}
 				}
 			}
 
-			void Drain() {
-				const auto &body = *job_;
+			void Drain()
+			{
+				const auto& body = *job_;
 				const unsigned total = jobRanges_;
-				for (;;) {
+				for (;;)
+				{
 					unsigned i = nextRange_.fetch_add(1, std::memory_order_relaxed);
 					if (i >= total) return;
 					SafeInvoke(body, i);
@@ -217,9 +237,9 @@ namespace ParallelRenderCull {
 			std::condition_variable done_;
 			bool stop_ = true;
 			uint64_t generation_ = 0;
-			const std::function<void(unsigned)> *job_ = nullptr;
+			const std::function<void(unsigned)>* job_ = nullptr;
 			unsigned jobRanges_ = 0;
-			std::atomic<unsigned> nextRange_{0};
+			std::atomic<unsigned> nextRange_{ 0 };
 			int pending_ = 0;
 		};
 
@@ -227,9 +247,10 @@ namespace ParallelRenderCull {
 
 		// ---- inline hook plumbing ---------------------------------------
 
-		struct Detour {
-			uint8_t *target = nullptr;
-			uint8_t *trampoline = nullptr;
+		struct Detour
+		{
+			uint8_t* target = nullptr;
+			uint8_t* trampoline = nullptr;
 			uint8_t saved[kRelocatedBytes]{};
 			bool installed = false;
 		};
@@ -237,28 +258,32 @@ namespace ParallelRenderCull {
 		Detour gStaticDetour;
 		Detour gDynamicDetour;
 
-		void WriteRelJump(uint8_t *at, const void *dest) {
+		void WriteRelJump(uint8_t* at, const void* dest)
+		{
 			at[0] = 0xE9;
 			const int32_t disp = static_cast<int32_t>(reinterpret_cast<uintptr_t>(dest) -
-			                                          (reinterpret_cast<uintptr_t>(at) + kJumpSize));
+				(reinterpret_cast<uintptr_t>(at) + kJumpSize));
 			std::memcpy(at + 1, &disp, sizeof(disp));
 		}
 
-		bool InstallDetour(Detour &d, uintptr_t targetVA, uint8_t frameByte, void *replacement) {
-			auto module = reinterpret_cast<uint8_t *>(GetModuleHandleW(nullptr));
+		bool InstallDetour(Detour& d, uintptr_t targetVA, uint8_t frameByte, void* replacement)
+		{
+			auto module = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
 			if (module == nullptr) return false;
 			d.target = module + (targetVA - kImageBase);
 
-			if (std::memcmp(d.target, kPrologue, sizeof(kPrologue)) != 0 || d.target[8] != frameByte) {
+			if (std::memcmp(d.target, kPrologue, sizeof(kPrologue)) != 0 || d.target[8] != frameByte)
+			{
 				Logger::GetInstance().WriteLineFormatted(LogLevel::Info, "parallel cull: %08X prologue mismatch, skipping",
-				    static_cast<unsigned>(targetVA));
+					static_cast<unsigned>(targetVA));
 				d.target = nullptr;
 				return false;
 			}
 
-			d.trampoline = static_cast<uint8_t *>(VirtualAlloc(
+			d.trampoline = static_cast<uint8_t*>(VirtualAlloc(
 				nullptr, kRelocatedBytes + kJumpSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
-			if (d.trampoline == nullptr) {
+			if (d.trampoline == nullptr)
+			{
 				d.target = nullptr;
 				return false;
 			}
@@ -268,7 +293,8 @@ namespace ParallelRenderCull {
 			std::memcpy(d.saved, d.target, kRelocatedBytes);
 
 			DWORD prot = 0;
-			if (!VirtualProtect(d.target, kRelocatedBytes, PAGE_EXECUTE_READWRITE, &prot)) {
+			if (!VirtualProtect(d.target, kRelocatedBytes, PAGE_EXECUTE_READWRITE, &prot))
+			{
 				VirtualFree(d.trampoline, 0, MEM_RELEASE);
 				d.trampoline = nullptr;
 				d.target = nullptr;
@@ -283,10 +309,12 @@ namespace ParallelRenderCull {
 			return true;
 		}
 
-		void RemoveDetour(Detour &d) {
+		void RemoveDetour(Detour& d)
+		{
 			if (!d.installed) return;
 			DWORD prot = 0;
-			if (VirtualProtect(d.target, kRelocatedBytes, PAGE_EXECUTE_READWRITE, &prot)) {
+			if (VirtualProtect(d.target, kRelocatedBytes, PAGE_EXECUTE_READWRITE, &prot))
+			{
 				std::memcpy(d.target, d.saved, kRelocatedBytes);
 				DWORD ignored = 0;
 				VirtualProtect(d.target, kRelocatedBytes, prot, &ignored);
@@ -304,36 +332,38 @@ namespace ParallelRenderCull {
 		// from ([esp+0x1C] static, [esp+0x14] dynamic); static tail also wants
 		// esi = this+0x134.
 
-		__declspec(naked) void __fastcall StaticTailThunk(void * /*ecx=this*/) {
+		__declspec(naked) void __fastcall StaticTailThunk(void* /*ecx=this*/)
+		{
 			__asm {
 				push ebp
 				mov  ebp, esp
-				and  esp, -8
+				and esp, -8
 				sub  esp, 0x70
 				push ebx
 				push ebp
 				push esi
 				push edi
 				mov  edi, ecx
-				mov  dword ptr [esp + 0x1C], ecx
+				mov  dword ptr[esp + 0x1C], ecx
 				lea  esi, [edi + 0x134]
 				mov  eax, gStaticTailTarget
 				jmp  eax
 			}
 		}
 
-		__declspec(naked) void __fastcall DynamicTailThunk(void * /*ecx=this*/) {
+		__declspec(naked) void __fastcall DynamicTailThunk(void* /*ecx=this*/)
+		{
 			__asm {
 				push ebp
 				mov  ebp, esp
-				and  esp, -8
+				and esp, -8
 				sub  esp, 0x78
 				push ebx
 				push ebp
 				push esi
 				push edi
 				mov  edi, ecx
-				mov  dword ptr [esp + 0x14], ecx
+				mov  dword ptr[esp + 0x14], ecx
 				mov  eax, gDynamicTailTarget
 				jmp  eax
 			}
@@ -341,86 +371,102 @@ namespace ParallelRenderCull {
 
 		// ---- gather ---------------------------------------------------
 
-		inline void ClearVec(RawVec *v) { v->end = v->begin; }
-		inline size_t CapElems(const RawVec *v, size_t sz) {
+		inline void ClearVec(RawVec* v) { v->end = v->begin; }
+		inline size_t CapElems(const RawVec* v, size_t sz)
+		{
 			return static_cast<size_t>(v->cap - v->begin) / sz;
 		}
 
-		inline int32_t FoldSortValue(void *viewObj, int32_t depthKey) {
+		inline int32_t FoldSortValue(void* viewObj, int32_t depthKey)
+		{
 			uint32_t sv = 0;
-			auto vt = *reinterpret_cast<void ***>(viewObj);
-			reinterpret_cast<GetSortValueFn>(vt[kViewObjVtGetSortValue / sizeof(void *)])(viewObj, &sv);
+			auto vt = *reinterpret_cast<void***>(viewObj);
+			reinterpret_cast<GetSortValueFn>(vt[kViewObjVtGetSortValue / sizeof(void*)])(viewObj, &sv);
 			return static_cast<int32_t>(static_cast<uint32_t>(depthKey) + sv * 0x10000u + (sv & 0xFFFF0000u));
 		}
 
-		inline uint8_t *RowArray(void *grid, int col) {
-			auto outer = *reinterpret_cast<uint8_t **>(reinterpret_cast<uint8_t *>(grid) + kGrid_OuterArray);
+		inline uint8_t* RowArray(void* grid, int col)
+		{
+			auto outer = *reinterpret_cast<uint8_t**>(reinterpret_cast<uint8_t*>(grid) + kGrid_OuterArray);
 			if (outer == nullptr) return nullptr;
-			return *reinterpret_cast<uint8_t **>(outer + static_cast<size_t>(col) * kGridOuterStride);
+			return *reinterpret_cast<uint8_t**>(outer + static_cast<size_t>(col) * kGridOuterStride);
 		}
 
-		void GatherStaticColumn(void *grid, float *zproj, int col, int c0, int r0, int r1,
-		                        std::vector<SortEl> &out) {
-			uint8_t *rows = RowArray(grid, col);
+		void GatherStaticColumn(void* grid, float* zproj, int col, int c0, int r0, int r1,
+			std::vector<SortEl>& out)
+		{
+			uint8_t* rows = RowArray(grid, col);
 			if (rows == nullptr) return;
 			const int32_t colAcc = col - c0 - 1;
-			for (int row = r0; row <= r1; ++row) {
+			for (int row = r0; row <= r1; ++row)
+			{
 				auto quad = rows + static_cast<size_t>(row) * kGridQuadStride;
-				auto e = *reinterpret_cast<void ***>(quad);
-				auto eEnd = *reinterpret_cast<void ***>(quad + 4);
+				auto e = *reinterpret_cast<void***>(quad);
+				auto eEnd = *reinterpret_cast<void***>(quad + 4);
 				const int32_t rowAcc = row - r0 - 1;
-				for (; e != eEnd; ++e) {
-					auto elem = reinterpret_cast<uint8_t *>(*e);
-					if ((*reinterpret_cast<uint16_t *>(elem + kElem_Flags) & 8) == 0) continue;
-					const int32_t hr = *reinterpret_cast<int32_t *>(elem + kElem_HomeRow);
-					const int32_t hc = *reinterpret_cast<int32_t *>(elem + kElem_HomeCol);
+				for (; e != eEnd; ++e)
+				{
+					auto elem = reinterpret_cast<uint8_t*>(*e);
+					if ((*reinterpret_cast<uint16_t*>(elem + kElem_Flags) & 8) == 0) continue;
+					const int32_t hr = *reinterpret_cast<int32_t*>(elem + kElem_HomeRow);
+					const int32_t hc = *reinterpret_cast<int32_t*>(elem + kElem_HomeCol);
 					const uint32_t x = (static_cast<uint32_t>(row - hr) - 1u) | static_cast<uint32_t>(rowAcc);
 					const uint32_t y = (static_cast<uint32_t>(col - hc) - 1u) | static_cast<uint32_t>(colAcc);
 					if (static_cast<int32_t>(x & y) >= 0) continue;
 					SortEl s;
 					SetForDepthSort(&s, elem, zproj);
-					s.key = FoldSortValue(*reinterpret_cast<void **>(elem + kElem_ViewObj), s.key);
+					s.key = FoldSortValue(*reinterpret_cast<void**>(elem + kElem_ViewObj), s.key);
 					out.push_back(s);
 				}
 			}
 		}
 
-		void GatherDynamicColumn(void *grid, float *zproj, int col, int c0, int r0, int r1,
-		                         std::vector<SortEl> &b0, std::vector<SortEl> &b1,
-		                         std::vector<SortEl> &b2, std::vector<void *> &bb) {
-			uint8_t *rows = RowArray(grid, col);
+		void GatherDynamicColumn(void* grid, float* zproj, int col, int c0, int r0, int r1,
+			std::vector<SortEl>& b0, std::vector<SortEl>& b1,
+			std::vector<SortEl>& b2, std::vector<void*>& bb)
+		{
+			uint8_t* rows = RowArray(grid, col);
 			if (rows == nullptr) return;
 			const int32_t colAcc = col - c0 - 1;
-			for (int row = r0; row <= r1; ++row) {
+			for (int row = r0; row <= r1; ++row)
+			{
 				auto quad = rows + static_cast<size_t>(row) * kGridQuadStride;
-				auto e = *reinterpret_cast<void ***>(quad);
-				auto eEnd = *reinterpret_cast<void ***>(quad + 4);
+				auto e = *reinterpret_cast<void***>(quad);
+				auto eEnd = *reinterpret_cast<void***>(quad + 4);
 				if (e == eEnd) continue;
-				auto quadFlags = reinterpret_cast<uint16_t *>(quad + 0x0C);
+				auto quadFlags = reinterpret_cast<uint16_t*>(quad + 0x0C);
 				if ((*quadFlags & 1) == 0) continue;
 
 				uint16_t newFlags = static_cast<uint16_t>(*quadFlags & 0xFFFE);
 				const int32_t rowAcc = row - r0 - 1;
-				for (; e != eEnd; ++e) {
-					auto elem = reinterpret_cast<uint8_t *>(*e);
-					const uint16_t ef = *reinterpret_cast<uint16_t *>(elem + kElem_Flags);
+				for (; e != eEnd; ++e)
+				{
+					auto elem = reinterpret_cast<uint8_t*>(*e);
+					const uint16_t ef = *reinterpret_cast<uint16_t*>(elem + kElem_Flags);
 					const bool selfLit = static_cast<int8_t>(ef & 0xFF) < 0; // 0x80
 					if ((ef & 8) != 0 && !selfLit) continue;
 
-					const int32_t hr = *reinterpret_cast<int32_t *>(elem + kElem_HomeRow);
-					const int32_t hc = *reinterpret_cast<int32_t *>(elem + kElem_HomeCol);
+					const int32_t hr = *reinterpret_cast<int32_t*>(elem + kElem_HomeRow);
+					const int32_t hc = *reinterpret_cast<int32_t*>(elem + kElem_HomeCol);
 					const uint32_t x = (static_cast<uint32_t>(row - hr) - 1u) | static_cast<uint32_t>(rowAcc);
 					const uint32_t y = (static_cast<uint32_t>(col - hc) - 1u) | static_cast<uint32_t>(colAcc);
-					if (static_cast<int32_t>(x & y) < 0) {
-						if ((ef & 8) == 0) {
+					if (static_cast<int32_t>(x & y) < 0)
+					{
+						if ((ef & 8) == 0)
+						{
 							SortEl s;
 							SetForDepthSort(&s, elem, zproj);
-							if (ef & 1) {
+							if (ef & 1)
+							{
 								b2.push_back(s);
-							} else if (ef & 0x100) {
+							}
+							else if (ef & 0x100)
+							{
 								b1.push_back(s);
-							} else {
-								s.key = FoldSortValue(*reinterpret_cast<void **>(elem + kElem_ViewObj), s.key);
+							}
+							else
+							{
+								s.key = FoldSortValue(*reinterpret_cast<void**>(elem + kElem_ViewObj), s.key);
 								b0.push_back(s);
 							}
 						}
@@ -432,17 +478,19 @@ namespace ParallelRenderCull {
 			}
 		}
 
-		struct Span {
+		struct Span
+		{
 			int lo, hi;
 		};
-		Span SpanFor(unsigned idx, unsigned ranges, int c0, int c1) {
+		Span SpanFor(unsigned idx, unsigned ranges, int c0, int c1)
+		{
 			const int total = c1 - c0 + 1;
 			const int base = total / static_cast<int>(ranges);
 			const int extra = total % static_cast<int>(ranges);
 			const int i = static_cast<int>(idx);
 			const int lo = c0 + i * base + (i < extra ? i : extra);
 			const int count = base + (i < extra ? 1 : 0);
-			return {lo, lo + count - 1};
+			return { lo, lo + count - 1 };
 		}
 
 		// ---- detours ------------------------------------------------
@@ -451,17 +499,20 @@ namespace ParallelRenderCull {
 		// it; gather on the render thread instead. Seeded from the previous frame.
 		constexpr size_t kMinParallelWork = 600;
 
-		struct ViewState {
+		struct ViewState
+		{
 			std::vector<std::vector<SortEl>> b0, b1, b2;
-			std::vector<std::vector<void *>> bb;
+			std::vector<std::vector<void*>> bb;
 			size_t lastTotal = 0;
-			std::atomic<uint32_t> fast{0}, fallback{0}, faults{0};
+			std::atomic<uint32_t> fast{ 0 }, fallback{ 0 }, faults{ 0 };
 
-			void Ensure(unsigned ranges) {
-				auto e = [ranges](auto &v) {
-					if (v.size() < ranges) v.resize(ranges);
-					for (auto &p : v) p.clear();
-				};
+			void Ensure(unsigned ranges)
+			{
+				auto e = [ranges](auto& v)
+					{
+						if (v.size() < ranges) v.resize(ranges);
+						for (auto& p : v) p.clear();
+					};
 				e(b0);
 				e(b1);
 				e(b2);
@@ -471,39 +522,43 @@ namespace ParallelRenderCull {
 		ViewState gStatic, gDynamic;
 
 		template <bool Dynamic>
-		void RunDetour(void *self) {
-			Detour &d = Dynamic ? gDynamicDetour : gStaticDetour;
+		void RunDetour(void* self)
+		{
+			Detour& d = Dynamic ? gDynamicDetour : gStaticDetour;
 			auto original = reinterpret_cast<DrawViewFn>(d.trampoline);
-			if (gMode == Mode::Off) {
+			if (gMode == Mode::Off)
+			{
 				original(self);
 				return;
 			}
 
-			ViewState &vs = Dynamic ? gDynamic : gStatic;
+			ViewState& vs = Dynamic ? gDynamic : gStatic;
 			uint32_t call = (Dynamic ? gDynamicCalls : gStaticCalls).fetch_add(1);
 			if (call == 0)
 				Logger::GetInstance().WriteLineFormatted(LogLevel::Debug, "parallel cull: first %s detour", Dynamic ? "dynamic" : "static");
 
-			if (gMode == Mode::Passthru) {
+			if (gMode == Mode::Passthru)
+			{
 				original(self);
 				return;
 			}
 
-			auto base = reinterpret_cast<uint8_t *>(self);
-			void *drawCtx = *reinterpret_cast<void **>(base + kOff_DrawCtx);
-			void *viewUtils = *reinterpret_cast<void **>(base + kOff_ViewUtils);
-			void *grid = *reinterpret_cast<void **>(base + kOff_QuadGrid);
+			auto base = reinterpret_cast<uint8_t*>(self);
+			void* drawCtx = *reinterpret_cast<void**>(base + kOff_DrawCtx);
+			void* viewUtils = *reinterpret_cast<void**>(base + kOff_ViewUtils);
+			void* grid = *reinterpret_cast<void**>(base + kOff_QuadGrid);
 
-			*reinterpret_cast<int32_t *>(reinterpret_cast<uint8_t *>(drawCtx) + 0x50) = Dynamic ? 4 : 1;
+			*reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(drawCtx) + 0x50) = Dynamic ? 4 : 1;
 
-			auto *buf0 = reinterpret_cast<RawVec *>(base + kOff_Buf0);
-			auto *buf1 = reinterpret_cast<RawVec *>(base + kOff_Buf1);
-			auto *buf2 = reinterpret_cast<RawVec *>(base + kOff_Buf2);
-			auto *bbv = reinterpret_cast<RawVec *>(base + kOff_Billboards);
+			auto* buf0 = reinterpret_cast<RawVec*>(base + kOff_Buf0);
+			auto* buf1 = reinterpret_cast<RawVec*>(base + kOff_Buf1);
+			auto* buf2 = reinterpret_cast<RawVec*>(base + kOff_Buf2);
+			auto* bbv = reinterpret_cast<RawVec*>(base + kOff_Billboards);
 
 			ClearVec(buf0);
 			ClearVec(buf1);
-			if (Dynamic) {
+			if (Dynamic)
+			{
 				ClearVec(buf2);
 				ClearVec(bbv);
 			}
@@ -513,18 +568,21 @@ namespace ParallelRenderCull {
 			float zproj[4];
 			ComputeViewportZProjection(zproj, viewUtils);
 
-			if (grid == nullptr) {
+			if (grid == nullptr)
+			{
 				original(self);
 				return;
 			}
-			if (gMode == Mode::TailOnly) {
+			if (gMode == Mode::TailOnly)
+			{
 				(Dynamic ? DynamicTailThunk : StaticTailThunk)(self);
 				return;
 			}
 
 			int c0 = 0, r0 = 0, c1 = 0, r1 = 0;
 			GetQuadrantsOfScreenRect(grid, rect, &c0, &r0, &c1, &r1);
-			if (c0 > c1 || r0 > r1) {
+			if (c0 > c1 || r0 > r1)
+			{
 				(Dynamic ? DynamicTailThunk : StaticTailThunk)(self);
 				return;
 			}
@@ -532,7 +590,8 @@ namespace ParallelRenderCull {
 			const unsigned columns = static_cast<unsigned>(c1 - c0 + 1);
 			unsigned ranges = 1;
 			if (gMode == Mode::Parallel && gPool.Size() > 0 && columns >= 2 &&
-			    vs.lastTotal >= kMinParallelWork) {
+				vs.lastTotal >= kMinParallelWork)
+			{
 				ranges = gPool.Size() + 1;
 				if (ranges > columns) ranges = columns;
 			}
@@ -540,20 +599,24 @@ namespace ParallelRenderCull {
 			gWorkerFaultCode.store(0);
 			vs.Ensure(ranges);
 
-			gPool.Run(ranges, [&](unsigned i) {
-				Span s = SpanFor(i, ranges, c0, c1);
-				for (int col = s.lo; col <= s.hi; ++col) {
-					if (Dynamic)
-						GatherDynamicColumn(grid, zproj, col, c0, r0, r1, vs.b0[i], vs.b1[i], vs.b2[i], vs.bb[i]);
-					else
-						GatherStaticColumn(grid, zproj, col, c0, r0, r1, vs.b0[i]);
-				}
-			});
+			gPool.Run(ranges, [&](unsigned i)
+				{
+					Span s = SpanFor(i, ranges, c0, c1);
+					for (int col = s.lo; col <= s.hi; ++col)
+					{
+						if (Dynamic)
+							GatherDynamicColumn(grid, zproj, col, c0, r0, r1, vs.b0[i], vs.b1[i], vs.b2[i], vs.bb[i]);
+						else
+							GatherStaticColumn(grid, zproj, col, c0, r0, r1, vs.b0[i]);
+					}
+				});
 
 			size_t n0 = 0, n1 = 0, n2 = 0, nbb = 0;
-			for (unsigned i = 0; i < ranges; ++i) {
+			for (unsigned i = 0; i < ranges; ++i)
+			{
 				n0 += vs.b0[i].size();
-				if (Dynamic) {
+				if (Dynamic)
+				{
 					n1 += vs.b1[i].size();
 					n2 += vs.b2[i].size();
 					nbb += vs.bb[i].size();
@@ -564,16 +627,18 @@ namespace ParallelRenderCull {
 			bool overflow = n0 > CapElems(buf0, sizeof(SortEl));
 			if (Dynamic)
 				overflow = overflow || n1 > CapElems(buf1, sizeof(SortEl)) ||
-				           n2 > CapElems(buf2, sizeof(SortEl)) || nbb > CapElems(bbv, sizeof(void *));
+				n2 > CapElems(buf2, sizeof(SortEl)) || nbb > CapElems(bbv, sizeof(void*));
 
-			if (uint32_t fc = gWorkerFaultCode.load()) {
+			if (uint32_t fc = gWorkerFaultCode.load())
+			{
 				if (vs.faults.fetch_add(1) < 4)
 					Logger::GetInstance().WriteLineFormatted(LogLevel::Error, "parallel cull: %s worker fault 0x%08X at %p, falling back",
-					    Dynamic ? "dynamic" : "static", fc, gWorkerFaultAddr.load());
+						Dynamic ? "dynamic" : "static", fc, gWorkerFaultAddr.load());
 				original(self);
 				return;
 			}
-			if (overflow) {
+			if (overflow)
+			{
 				// Vector lacked spare capacity; the stock path grows it and the
 				// next redraw fits.
 				vs.fallback.fetch_add(1);
@@ -584,27 +649,31 @@ namespace ParallelRenderCull {
 			uint32_t f = vs.fast.fetch_add(1) + 1;
 			if ((f & (f - 1)) == 0)
 				Logger::GetInstance().WriteLineFormatted(LogLevel::Debug,
-				    "parallel cull: %s fast #%u ranges=%u total=%zu fallbacks=%u",
-				    Dynamic ? "dynamic" : "static", f, ranges, n0 + n1 + n2, vs.fallback.load());
+					"parallel cull: %s fast #%u ranges=%u total=%zu fallbacks=%u",
+					Dynamic ? "dynamic" : "static", f, ranges, n0 + n1 + n2, vs.fallback.load());
 
-			auto concat = [&](RawVec *v, std::vector<std::vector<SortEl>> &parts) {
-				auto *p = reinterpret_cast<SortEl *>(v->begin);
-				for (unsigned i = 0; i < ranges; ++i)
-					if (!parts[i].empty()) {
-						std::memcpy(p, parts[i].data(), parts[i].size() * sizeof(SortEl));
-						p += parts[i].size();
-					}
-				v->end = reinterpret_cast<uint8_t *>(p);
-			};
+			auto concat = [&](RawVec* v, std::vector<std::vector<SortEl>>& parts)
+				{
+					auto* p = reinterpret_cast<SortEl*>(v->begin);
+					for (unsigned i = 0; i < ranges; ++i)
+						if (!parts[i].empty())
+						{
+							std::memcpy(p, parts[i].data(), parts[i].size() * sizeof(SortEl));
+							p += parts[i].size();
+						}
+					v->end = reinterpret_cast<uint8_t*>(p);
+				};
 			concat(buf0, vs.b0);
-			if (Dynamic) {
+			if (Dynamic)
+			{
 				concat(buf1, vs.b1);
 				concat(buf2, vs.b2);
-				auto *p = bbv->begin;
+				auto* p = bbv->begin;
 				for (unsigned i = 0; i < ranges; ++i)
-					if (!vs.bb[i].empty()) {
-						std::memcpy(p, vs.bb[i].data(), vs.bb[i].size() * sizeof(void *));
-						p += vs.bb[i].size() * sizeof(void *);
+					if (!vs.bb[i].empty())
+					{
+						std::memcpy(p, vs.bb[i].data(), vs.bb[i].size() * sizeof(void*));
+						p += vs.bb[i].size() * sizeof(void*);
 					}
 				bbv->end = p;
 			}
@@ -612,8 +681,8 @@ namespace ParallelRenderCull {
 			(Dynamic ? DynamicTailThunk : StaticTailThunk)(self);
 		}
 
-		void __fastcall DetourStaticView(void *self, void * /*edx*/) { RunDetour<false>(self); }
-		void __fastcall DetourDynamicView(void *self, void * /*edx*/) { RunDetour<true>(self); }
+		void __fastcall DetourStaticView(void* self, void* /*edx*/) { RunDetour<false>(self); }
+		void __fastcall DetourDynamicView(void* self, void* /*edx*/) { RunDetour<true>(self); }
 
 		// ---- install ----------------------------------------------
 
@@ -622,7 +691,8 @@ namespace ParallelRenderCull {
 
 	} // namespace
 
-	Mode ParseMode(const char *v) {
+	Mode ParseMode(const char* v)
+	{
 		if (_stricmp(v, "0") == 0 || _stricmp(v, "off") == 0 || _stricmp(v, "false") == 0) return Mode::Off;
 		if (_stricmp(v, "passthru") == 0) return Mode::Passthru;
 		if (_stricmp(v, "tailonly") == 0) return Mode::TailOnly;
@@ -630,28 +700,32 @@ namespace ParallelRenderCull {
 		return Mode::Parallel;
 	}
 
-	bool Install(unsigned workers, uintptr_t workerAffinity, Mode requested) {
+	bool Install(unsigned workers, uintptr_t workerAffinity, Mode requested)
+	{
 		if (gInstalled) return true;
 
-		if (requested == Mode::Off) {
+		if (requested == Mode::Off)
+		{
 			Logger::GetInstance().WriteLine(LogLevel::Info, "parallel cull: turned off");
 			return false;
 		}
 		if (workers > kMaxWorkers) workers = kMaxWorkers;
 		// With fewer than two workers to share the gather, the detour costs about what it saves.
-		if (requested == Mode::Parallel && workers < 2) {
+		if (requested == Mode::Parallel && workers < 2)
+		{
 			Logger::GetInstance().WriteLineFormatted(LogLevel::Info,
-			    "parallel cull: only %u logical processor(s) free for workers, skipping", workers);
+				"parallel cull: only %u logical processor(s) free for workers, skipping", workers);
 			return false;
 		}
-		if (!GameVersion::IsSupportedForPatches()) {
+		if (!GameVersion::IsSupportedForPatches())
+		{
 			Logger::GetInstance().WriteLineFormatted(LogLevel::Info, "parallel cull: requires SimCity 4 1.1.641, skipping");
 			return false;
 		}
 
-		auto module = reinterpret_cast<uint8_t *>(GetModuleHandleW(nullptr));
+		auto module = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
 		if (module == nullptr) return false;
-		auto rebase = [&](uintptr_t va) { return reinterpret_cast<void *>(module + (va - kImageBase)); };
+		auto rebase = [&](uintptr_t va) { return reinterpret_cast<void*>(module + (va - kImageBase)); };
 
 		GetVisibleContainerRect = reinterpret_cast<GetVisibleContainerRectFn>(rebase(kGetVisibleContainerRectVA));
 		ComputeViewportZProjection = reinterpret_cast<ComputeViewportZProjectionFn>(rebase(kComputeViewportZProjectionVA));
@@ -666,25 +740,27 @@ namespace ParallelRenderCull {
 		if (workers > 0) gPool.Start(workers, workerAffinity);
 
 		bool a = InstallDetour(gStaticDetour, kDrawStaticViewVA, kStaticFrameByte,
-		                       reinterpret_cast<void *>(&DetourStaticView));
+			reinterpret_cast<void*>(&DetourStaticView));
 		bool b = InstallDetour(gDynamicDetour, kDrawDynamicViewVA, kDynamicFrameByte,
-		                       reinterpret_cast<void *>(&DetourDynamicView));
-		if (!a && !b) {
+			reinterpret_cast<void*>(&DetourDynamicView));
+		if (!a && !b)
+		{
 			if (workers > 0) gPool.Stop();
 			return false;
 		}
 
 		gInstalled = true;
-		const char *name = gMode == Mode::Passthru ? "passthru"
-		                   : gMode == Mode::TailOnly ? "tailonly"
-		                   : gMode == Mode::Serial   ? "serial"
-		                                             : "parallel";
+		const char* name = gMode == Mode::Passthru ? "passthru"
+			: gMode == Mode::TailOnly ? "tailonly"
+			: gMode == Mode::Serial ? "serial"
+			: "parallel";
 		Logger::GetInstance().WriteLineFormatted(LogLevel::Info, "parallel cull installed: mode=%s workers=%u affinity=0x%08lX static=%s dynamic=%s",
-		    name, workers, static_cast<unsigned long>(workerAffinity), a ? "ok" : "skip", b ? "ok" : "skip");
+			name, workers, static_cast<unsigned long>(workerAffinity), a ? "ok" : "skip", b ? "ok" : "skip");
 		return true;
 	}
 
-	void Uninstall() {
+	void Uninstall()
+	{
 		if (!gInstalled) return;
 		RemoveDetour(gStaticDetour);
 		RemoveDetour(gDynamicDetour);

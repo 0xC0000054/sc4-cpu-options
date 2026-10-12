@@ -11,7 +11,8 @@
 
 #pragma once
 
-namespace SimTickBudget {
+namespace SimTickBudget
+{
 
 	// The ceiling used when neither the configuration file nor the command line sets one.
 	constexpr int kDefaultCapMs = 32;

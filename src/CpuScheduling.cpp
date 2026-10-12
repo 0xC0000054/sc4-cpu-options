@@ -106,7 +106,7 @@ namespace CpuScheduling
 					processors.push_back({
 						entry->CpuSet.Id, entry->CpuSet.Group, entry->CpuSet.LogicalProcessorIndex,
 						entry->CpuSet.EfficiencyClass, entry->CpuSet.CoreIndex
-					});
+						});
 				}
 				offset += entry->Size;
 			}
