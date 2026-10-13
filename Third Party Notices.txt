@@ -34,7 +34,7 @@ License notice for SCD3D11
 
 src/CpuScheduling.h, src/CpuScheduling.cpp, src/ParallelRenderCull.h, src/ParallelRenderCull.cpp,
 src/SimTickBudget.h, src/SimTickBudget.cpp and tests/CpuSchedulingTest.cpp come from SCD3D11
-(https://github.com/UlisseWolf/scd3d11).
+(https://github.com/caspervg/scd3d11).
 
 Copyright (C) 2026 Casper Van Gheluwe
 
