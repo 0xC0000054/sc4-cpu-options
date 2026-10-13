@@ -346,7 +346,7 @@ public:
 
 			// The render thread gathers too, so one processor stays its own.
 			workerAffinity = scheduling.allowedMask;
-			workers = CountBits(workerAffinity) > 0 ? CountBits(workerAffinity) - 1 : 0;
+			workers = workerAffinity > 0 ? CountBits(workerAffinity) - 1 : 0;
 		}
 		else if (DWORD_PTR const gameCore = ConfigureForSingleCPU(scheduling); gameCore != 0)
 		{
@@ -358,7 +358,7 @@ public:
 		else
 		{
 			workerAffinity = scheduling.allowedMask;
-			workers = CountBits(workerAffinity) > 0 ? CountBits(workerAffinity) - 1 : 0;
+			workers = workerAffinity > 0 ? CountBits(workerAffinity) - 1 : 0;
 		}
 
 		// High priority, unless the command line asks for another with -CPUPriority. The game
