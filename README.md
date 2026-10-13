@@ -65,7 +65,7 @@ See [LICENSE.txt](LICENSE.txt) for more information.
 
 ## 3rd party code
 
-[gzcom-dll](https://github.com/nsgomez/gzcom-dll) Located in the vendor folder, MIT License.
+[gzcom-dll](https://github.com/nsgomez/gzcom-dll) Located in the vendor folder, MIT License.    
 [SCD3D11](https://github.com/nsgomez/gzcom-dll) - Original source for several CPU fixes, GNU Lesser General Public License, version 2.1 or later License.
 
 The files that come from SCD3D11 are (`CpuScheduling`, `ParallelRenderCull`, `SimTickBudget` and `tests/CpuSchedulingTest.cpp`).
